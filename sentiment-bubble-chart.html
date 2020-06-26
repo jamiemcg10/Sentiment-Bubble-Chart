@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="uft-8">
+        <title>Sentiment Bubble Chart</title>
+        <link rel="stylesheet" href="./styles/common.css">
+        <link rel="icon" href="./assets/Icon - Color.png">
+
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.22.2/moment.min.js"></script> 
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.3"></script>   
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.16.2/xlsx.full.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha256-9/aliU8dGd2tb6OSsuzixeV4y/faTqgFtohetphbbj0=" crossorigin="anonymous"></script>   
+        <noscript><p class="error">Javascript must be enabled to use this tool.</p></noscript>
+        <script src="./scripts/chartManipulation.js"></script>
+        <script>
+            var data;
+
+            $('document').ready(function(){    
+                var fileText;
+                var fileSelect = document.getElementById('file');
+
+                $('#file').change(function(){    
+                    $('#file-select-container').append('<p class="status">Uploading...</p>');                
+                    getFile(fileSelect.files[0]);
+                });
+
+
+                function getFile(file) {
+                    var reader = new FileReader();
+                    reader.readAsArrayBuffer(file);
+
+                    reader.onload = function(event) {
+                        var content = new Uint8Array(event.target.result);
+                        var workbook = XLSX.read(content, {type: 'array'});
+                        var firstSheetName = workbook.SheetNames[0];
+                        var worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                        var range = XLSX.utils.decode_range(worksheet['!ref']);
+
+                        var colIndices = findNeededColumns(worksheet, range);
+                        data = createDataArray(worksheet, colIndices, range).data;
+
+                        var videoList = createDataArray(worksheet, colIndices, range).videoList;
+
+                        if(typeof window.Event === 'function'){
+                            var dataLoadedEvent = new Event('Data Loaded');
+                        } else {
+                            var dataLoadedEvent = document.createEvent('Event');
+                            dataLoadedEvent.initEvent('Data Loaded', true, true);
+                        }
+
+                        renderMainPage(videoList);
+                        
+                        document.dispatchEvent(dataLoadedEvent);
+                    };                                      
+                      
+                }
+
+
+
+                function findNeededColumns(worksheet, range){
+                    var time;
+                    var comment;
+                    var video;
+                    var sentimentScore;
+                    var sentimentMagnitude;
+
+                    for(var col=range.s.c; col<= range.e.c; col++){
+                        var cell = XLSX.utils.encode_cell({c: col, r: 0});
+                        if (worksheet[cell].v === 'time'){
+                            time = col;
+                        }
+
+                        if (worksheet[cell].v === 'comment'){
+                            comment = col;
+                        }
+
+                        if (worksheet[cell].v === 'video'){
+                            video = col;
+                        }
+
+                        if (worksheet[cell].v === 'sentimentScore'){
+                            sentimentScore = col;
+                        }
+
+                        if (worksheet[cell].v === 'sentimentMagnitude'){
+                            sentimentMagnitude = col;
+                        }
+                    }
+
+                    return {time: time, comment: comment, video: video, sentimentScore: sentimentScore, sentimentMagnitude: sentimentMagnitude};
+
+                }
+
+                function createDataArray(worksheet, colIndices, range){
+                    function getDisplayTime(x){
+                        var seconds = Math.floor(Math.round(x)%60);
+                        var minutes = Math.floor(Math.round(x)/60);
+                        var hours = Math.floor(Math.round(x)/3600);
+                        return new Date(2000, 0, 1, hours, minutes, seconds);
+                    }
+
+                    var data = [];
+                    var videoList = new Set();
+
+                    for (var row=1; row<= range.e.r; row++){
+                        var timeCell = XLSX.utils.encode_cell({c: colIndices.time, r: row});
+                        var commentCell = XLSX.utils.encode_cell({c: colIndices.comment, r: row});
+                        var videoCell = XLSX.utils.encode_cell({c: colIndices.video, r: row});
+                        var sentimentScoreCell = XLSX.utils.encode_cell({c: colIndices.sentimentScore, r: row});
+                        var sentimentMagnitudeCell = XLSX.utils.encode_cell({c: colIndices.sentimentMagnitude, r: row});
+
+                        if (worksheet[videoCell] !== undefined & worksheet[timeCell] !== undefined & worksheet[sentimentScoreCell] !== undefined
+                        & worksheet[sentimentMagnitudeCell] !== undefined & worksheet[commentCell] !== undefined){
+                            data.push({video: worksheet[videoCell].v, x: getDisplayTime(worksheet[timeCell].v), y: worksheet[sentimentScoreCell].v, r: worksheet[sentimentMagnitudeCell].v * 10, comment: worksheet[commentCell].v});
+                            videoList.add(worksheet[videoCell].v);
+                        }
+                    }
+
+                    return {data: data, videoList: videoList};
+                }
+
+                function renderMainPage(videoList){
+                    $('#file-select-container').remove();
+                    $('#title').remove();   
+                    $('body').css('backgroundColor', 'white');
+
+                    $('#logo').css('position', 'absolute');
+                    $('#logo').css('right', '15px');
+                    $('#logo').css('margin-right', '');
+                    $('#logo').css('width', '10vw');
+                    $('#logo').css('margin-top', '0px');
+                    $('#logo').attr('src', './assets/Lumiere - Color.png');
+
+
+                    $('body').append($('<div class="dropdown">' + 
+                                            '<label for="dataset-select">Cell </label>' + 
+                                            '<select id="dataset-select"></select>' +   
+                                        '</div>'));
+                    $('body').append('<canvas id="myChart"></canvas>');
+                    $('body').append('<div id="crop-start">' + 
+                                            '<input type="number" id="hStart" min=0 max=23>:' + 
+                                            '<input type="number" id="mStart" min=0 max=59>:' + 
+                                            '<input type="number" id="sStart" min=0 max=59>' + 
+                                            ' <button id="crop-start-btn">>></button>' + 
+                                        '</div>');
+                    $('body').append('<div id="crop-end">' + 
+                                            '<button id="crop-end-btn"><<</button> ' + 
+                                            '<input type="number" id="hEnd" min=0 max=23>:' + 
+                                            '<input type="number" id="mEnd" min=0 max=59>:' + 
+                                            '<input type="number" id="sEnd" min=0 max=59>' + 
+                                            '</div>');
+
+                    videoList.forEach(function(k,v,S){
+                        if ($('#dataset-select').children().length === 0){
+                            $('#dataset-select').append('<option default=true value="' + v + '">' + v + '</option>');
+                        } else {
+                            $('#dataset-select').append('<option value="' + v + '">' + v + '</option>')
+                        }
+
+                    });
+
+                }
+
+            });
+        </script>
+
+    </head>
+
+    <body>
+        <img src="./assets/Lumiere - White.png" id="logo" alt="logo">
+        <h1 id="title">Sentiment Bubble Chart Creator</h1>
+        <div id="file-select-container">
+            <label for="file">Select an Excel data file (.xlsx, .xls, .csv)</label><input type="file" id="file" accept=".xls, .xlsx, .csv" required>
+        </div>
+    </body>
+</html>

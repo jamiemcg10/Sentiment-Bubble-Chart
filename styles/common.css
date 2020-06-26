@@ -1,0 +1,115 @@
+* {
+    margin: 0;
+    padding: 0;
+    font-family: Arial, Helvetica, sans-serif;
+    color: rgb(100,100,100);
+
+
+}
+
+body {
+    background-color: red;
+}
+
+button {
+    width: 35px;
+    font-weight: bold;
+}
+
+canvas {
+    margin-top: -5vh;
+}
+
+#crop-end {
+    display: inline;
+    float: right;
+    margin-right: 2vw;
+    color: rgb(177,177,177);
+}
+
+
+#crop-start {
+    display: inline;
+    margin-left: 6vw;
+    color: rgb(177,177,177);
+}
+
+.dropdown {
+    margin-top: 2vh; /* don't make this value larger */
+    margin-left: 2vw;
+    position: relative;
+    font-weight: bold;
+}
+
+.error{
+    color: black;
+    font-size: x-large;
+    font-weight: bold;
+    margin-left: 50px;
+    top: 25px;
+    position: absolute;
+}
+
+#file{
+    display: block;
+    margin-top: 5px;    
+    margin-bottom: 15px;
+}
+
+#file-select-container{
+    background: lightgrey;
+    padding: 15px;
+    border-radius: 15px;
+    width: fit-content;
+    margin-left: 50px;
+    margin-right: 50px;
+    margin-top: 15px;
+    height: 95px;
+    width: 350px;
+}
+
+h1 {    
+    margin-top: 50px;
+    margin-left: 50px;
+    color: white;
+    clear: both;
+}
+
+input[type=number]{
+    width: 15px;
+}
+
+/* Chrome, Safari, Edge, Opera */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Firefox */
+input[type=number] {
+  -moz-appearance: textfield;
+}
+
+#logo {    
+    width: 20vw;
+    display: block;
+    float: right;
+    margin-right: 15px;
+    margin-top: 25px;
+    margin-bottom: 50px;
+}
+
+#myChart {
+    margin: 0;
+    padding: 0;
+    margin-top: -5vh;
+}
+
+select {
+    font-weight: bold;
+}
+
+.status{
+    font-style: italic;
+}
