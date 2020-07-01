@@ -1,17 +1,12 @@
-document.addEventListener("Data Loaded", function(){
-                
+document.addEventListener("Data Loaded", function(event){
     var selectedDatasetName = document.getElementById('dataset-select');
     var selectedDatasetTitle = document.querySelector('option[value="' + selectedDatasetName.value + '"]').innerHTML;
     var cropStartBtn = document.getElementById('crop-start-btn');
     var cropEndBtn = document.getElementById('crop-end-btn');
+    var showComments = document.getElementById('showComments');
+    var shownCommentData = [];
 
-    var positiveSelectedData = data.filter(function(dPoint){
-        return dPoint.video === selectedDatasetName.value & dPoint.y >= 0;
-    });
-
-    var negativeSelectedData = data.filter(function(dPoint){
-        return dPoint.video === selectedDatasetName.value & dPoint.y < 0;
-    });
+    filterData();
 
     var axisMin;
     var axisMax;
@@ -26,6 +21,7 @@ document.addEventListener("Data Loaded", function(){
                                             backgroundColor: "rgb(0,67,107)",
                                             hoverBackgroundColor: "rgb(171,171,171)",
                                             hoverBorderColor: "rgb(0,67,107)",
+                                            yAxisID: 'sentiment-axis'
                                         },
                                         {
                                             label:"negative",
@@ -33,6 +29,12 @@ document.addEventListener("Data Loaded", function(){
                                             backgroundColor: "rgb(190,0,0)",
                                             hoverBackgroundColor: "rgb(171,171,171)",
                                             hoverBorderColor: "rgb(190,0,0)",
+                                            yAxisID: 'sentiment-axis'
+                                        },
+                                        {
+                                            data: shownCommentData,
+                                            yAxisID: 'comment-axis',
+                                            type: 'line',
                                         }
                                     ]
                                 },
@@ -49,7 +51,8 @@ document.addEventListener("Data Loaded", function(){
                                         position: "nearest",
                                         callbacks: {
                                             label: function(tooltipItem, data){
-                                                var label = data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index].x.toLocaleTimeString('en-GB') + ' - ' + data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index].comment;
+                                                var content = data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index].comment !== undefined ? data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index].comment : data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index].y;
+                                                var label = data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index].x.toLocaleTimeString('en-GB') + ' - ' + content;
                                                 return label;
                                             }
                                         }
@@ -89,6 +92,7 @@ document.addEventListener("Data Loaded", function(){
                                             }
                                         }],
                                         yAxes: [{
+                                            id: 'sentiment-axis',
                                             scaleLabel: {
                                                 display: true,
                                                 labelString: "Sentiment",
@@ -97,6 +101,20 @@ document.addEventListener("Data Loaded", function(){
                                             ticks: {                                                
                                                 fontStyle: 'bold',
                                             }
+                                        },{
+                                            id: 'comment-axis',
+                                            position: 'right',
+                                            scaleLabel: {
+                                                display: true,
+                                                labelString: '# of comments',
+                                                fontStyle: 'bold',
+                                            },
+                                            ticks: {                                                
+                                                fontStyle: 'bold',
+                                                min: 0,
+                                                stepSize: 1,
+                                            },
+                                            display: false,   
                                         }]
                                     }
                                 }                                             
@@ -130,6 +148,9 @@ document.addEventListener("Data Loaded", function(){
             negativeSelectedData = data.filter(function(dPoint){
                 return dPoint.video === selectedDatasetName.value & dPoint.y < 0 & dPoint.x >= axisMin & (dPoint.x <= axisMax || axisMax === undefined);
             });
+            selectedCommentData = commentData.filter(function(dPoint){
+                return dPoint.video === selectedDatasetName.value & dPoint.x >= axisMin & (dPoint.x <= axisMax || axisMax === undefined);
+            });
         } else if (direction === "end"){
             if (reset){
                 axisMax = undefined;
@@ -139,6 +160,9 @@ document.addEventListener("Data Loaded", function(){
                 negativeSelectedData = data.filter(function(dPoint){
                     return dPoint.video === selectedDatasetName.value & dPoint.y < 0 & (dPoint.x >= axisMin || axisMin === undefined);
                 });
+                selectedCommentData = commentData.filter(function(dPoint){
+                    return dPoint.video === selectedDatasetName.value & (dPoint.x >= axisMin || axisMin === undefined);
+                });
             } else{
                 axisMax = new Date(2000, 0, 1, h, m, s);
                 positiveSelectedData = data.filter(function(dPoint){
@@ -147,18 +171,26 @@ document.addEventListener("Data Loaded", function(){
                 negativeSelectedData = data.filter(function(dPoint){
                     return dPoint.video === selectedDatasetName.value & dPoint.y < 0 & dPoint.x <= axisMax & (dPoint.x >= axisMin || axisMin === undefined);
                 });
+                selectedCommentData = commentData.filter(function(dPoint){
+                    return dPoint.video === selectedDatasetName.value & dPoint.x <= axisMax & (dPoint.x >= axisMin || axisMin === undefined);
+                });
             }
         }
+
+        selectedCommentData = insertMissingTimes(selectedCommentData);
 
         if (positiveSelectedData.length !== 0 | negativeSelectedData.length !== 0){
             
             chart.options.scales.xAxes[0].ticks.min = axisMin;
             chart.options.scales.xAxes[0].ticks.max = axisMax;
+            chart.options.scales.yAxes[1].ticks.max = undefined;
 
             chart.data.datasets[0].data = positiveSelectedData;
             chart.data.datasets[1].data = negativeSelectedData;
+            chart.data.datasets[2].data = showComments.checked ? selectedCommentData : [];
 
             chart.update();
+
         } else {
             axisMin = tempAxisMin;
             axisMax = tempAxisMax;
@@ -214,16 +246,50 @@ document.addEventListener("Data Loaded", function(){
 
     });
 
-    selectedDatasetName.addEventListener("change", function(){
+    function filterData(){
         positiveSelectedData = data.filter(function(dPoint){
             return dPoint.video === selectedDatasetName.value & dPoint.y >= 0;
         });
         negativeSelectedData = data.filter(function(dPoint){
             return dPoint.video === selectedDatasetName.value & dPoint.y < 0;
         });
+        selectedCommentData = commentData.filter(function(dPoint){
+            return dPoint.video === selectedDatasetName.value;
+        });
+
+        selectedCommentData = insertMissingTimes(selectedCommentData);
+        
+    }
+
+    function insertMissingTimes(array){
+        var fullArray = [];
+        var start;
+        if (new Date(2000, 0, 1, 0, 0, 0) < array[0].x){
+            // do something if first entry isn't 0
+            fullArray.push({x: new Date(2000, 0, 1, 0, 0, 0), y: 0, video: array[0].video});
+            start=0;
+        } else {
+            fullArray.push(array[0]);
+            start=1;
+        }
+        for (var i=start; i<array.length; i++){
+            while (array[i].x - fullArray[fullArray.length-1].x > 5000){
+                fullArray.push({x: new Date(fullArray[fullArray.length-1].x.getTime() + 5000), y: 0, video: array[i].video});
+            } 
+            
+            fullArray.push(array[i]);
+            
+        }
+
+        return fullArray;
+    }
+
+    selectedDatasetName.addEventListener("change", function(){
+        filterData();
 
         chart.data.datasets[0].data = positiveSelectedData;
         chart.data.datasets[1].data = negativeSelectedData;
+        chart.data.datasets[2].data = showComments.checked ? selectedCommentData : [];
 
         
         selectedDatasetTitle = document.querySelector("option[value='" + selectedDatasetName.value + "']").innerHTML;
@@ -234,6 +300,22 @@ document.addEventListener("Data Loaded", function(){
         
         chart.update();
     });
+
+    showComments.addEventListener("change", function(){
+        console.log(showComments.checked);
+        if (showComments.checked){            
+            chart.data.datasets[2].data = selectedCommentData;
+            chart.options.scales.yAxes[1].display = true;
+        } else {
+            chart.data.datasets[2].data = [];
+            chart.options.scales.yAxes[1].display = false;
+        }
+
+        console.log(selectedCommentData);
+        chart.options.scales.yAxes[1].ticks.max = undefined;
+        chart.update();
+    });
+
 
 
 });

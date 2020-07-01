@@ -17,6 +17,8 @@
         <script src="./scripts/chartManipulation.js"></script>
         <script>
             var data;
+            var videoList;
+            var commentData;
 
             $('document').ready(function(){    
                 var fileText;
@@ -40,9 +42,10 @@
                         var range = XLSX.utils.decode_range(worksheet['!ref']);
 
                         var colIndices = findNeededColumns(worksheet, range);
-                        data = createDataArray(worksheet, colIndices, range).data;
-
-                        var videoList = createDataArray(worksheet, colIndices, range).videoList;
+                        
+                        //data = createDataArray(worksheet, colIndices, range).data;
+                        //videoList = createDataArray(worksheet, colIndices, range).videoList;
+                        [data, videoList, commentData] = createDataArray(worksheet, colIndices, range);
 
                         if(typeof window.Event === 'function'){
                             var dataLoadedEvent = new Event('Data Loaded');
@@ -104,6 +107,7 @@
 
                     var data = [];
                     var videoList = new Set();
+                    var numComments = new Map();
 
                     for (var row=1; row<= range.e.r; row++){
                         var timeCell = XLSX.utils.encode_cell({c: colIndices.time, r: row});
@@ -117,9 +121,43 @@
                             data.push({video: worksheet[videoCell].v, x: getDisplayTime(worksheet[timeCell].v), y: worksheet[sentimentScoreCell].v, r: worksheet[sentimentMagnitudeCell].v * 10, comment: worksheet[commentCell].v});
                             videoList.add(worksheet[videoCell].v);
                         }
+
+                        if (worksheet[videoCell] !== undefined & worksheet[timeCell] !== undefined & worksheet[commentCell] !== undefined){
+                            var timeRounded = worksheet[timeCell].v % 5 <= 1.5 ? worksheet[timeCell].v - (worksheet[timeCell].v % 5) : worksheet[timeCell].v + (5-(worksheet[timeCell].v % 5));
+                            //console.log(numComments.get(timeRounded + ',' + worksheet[videoCell].v));
+                            numComments.set(timeRounded + ',' + worksheet[videoCell].v, numComments.get(timeRounded + ',' + worksheet[videoCell].v) === undefined ? 1 : numComments.get(timeRounded + ',' + worksheet[videoCell].v)+1);
+                            //console.log(numComments.get(timeRounded + ',' + worksheet[videoCell].v));
+                            
+                        } else if (row <= 101) {
+                            console.log(worksheet[videoCell]);
+                            console.log(worksheet[timeCell]);
+                            console.log(worksheet[commentCell]);
+                        }
                     }
 
-                    return {data: data, videoList: videoList};
+                    var commentsFrequencies = Array.from(numComments); // needs to change to support IE
+                    //debugger;
+                    commentsFrequencies.sort(sortCommentFrequencies);
+                    //debugger;
+                    for (var i=0; i<commentsFrequencies.length; i++){
+                        var split = commentsFrequencies[i][0].indexOf(',');
+                        commentsFrequencies[i] = {x: getDisplayTime(Number(commentsFrequencies[i][0].substring(0,split))), y:commentsFrequencies[i][1], video:commentsFrequencies[i][0].substring(split+1)};
+                    }
+                    //debugger;
+                    
+                    return [data, videoList, commentsFrequencies];
+
+                    function sortCommentFrequencies(a, b){
+                        var aTime = a[0].indexOf(',');
+                        var bTime = b[0].indexOf(',');
+                        //a.substring(0,aTime);
+                        //b.substring(0,bTime);
+                        if (Number(a[0].substring(0,aTime)) < Number(b[0].substring(0,bTime))){
+                            return -1;
+                        } else {
+                            return 1;
+                        }
+                    }
                 }
 
                 function renderMainPage(videoList){
@@ -136,8 +174,9 @@
 
 
                     $('body').append($('<div class="dropdown">' + 
-                                            '<label for="dataset-select">Cell </label>' + 
+                                            '<label for="dataset-select">Video </label>' + 
                                             '<select id="dataset-select"></select>' +   
+                                            '<input id="showComments" type="checkbox">Show comment volume</input>' + 
                                         '</div>'));
                     $('body').append('<canvas id="myChart"></canvas>');
                     $('body').append('<div id="crop-start">' + 

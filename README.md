@@ -11,6 +11,8 @@ Required columns (in any order):
 
 Other columns will be ignored.
 
+Check the box next to 'Show comment volume' to display an area chart showing the number of comments left during the video (grouped into 5 second increments).
+
 Use the text boxes at the bottom of the chart to crop the time scale. Enter hours in the first box, minutes in the second, and seconds in the third, then click the arrow button next to the boxes to crop the scale to that value. Invalid times are not accepted. To reset, click the arrow button with the boxes empty.
 
 Sample chart from included sample data:
