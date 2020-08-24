@@ -19,6 +19,7 @@
             var data;
             var videoList;
             var commentData;
+            var averageData;
 
             $('document').ready(function(){    
                 var fileText;
@@ -45,7 +46,7 @@
                         
                         //data = createDataArray(worksheet, colIndices, range).data;
                         //videoList = createDataArray(worksheet, colIndices, range).videoList;
-                        [data, videoList, commentData] = createDataArray(worksheet, colIndices, range);
+                        [data, videoList, commentData, averageData] = createDataArray(worksheet, colIndices, range);   // needs to change to support IE
 
                         if(typeof window.Event === 'function'){
                             var dataLoadedEvent = new Event('Data Loaded');
@@ -108,22 +109,29 @@
                     var data = [];
                     var videoList = new Set();
                     var numComments = new Map();
+                    var avgSentiment = new Map(); // 8/20 - start from here - make new map to hold the average sentiment score
 
                     for (var row=1; row<= range.e.r; row++){
+                        if (worksheet[XLSX.utils.encode_cell({c:0,r:row})].v === ""){ // check for end of sheet
+                            break;
+                        }
                         var timeCell = XLSX.utils.encode_cell({c: colIndices.time, r: row});
                         var commentCell = XLSX.utils.encode_cell({c: colIndices.comment, r: row});
                         var videoCell = XLSX.utils.encode_cell({c: colIndices.video, r: row});
                         var sentimentScoreCell = XLSX.utils.encode_cell({c: colIndices.sentimentScore, r: row});
                         var sentimentMagnitudeCell = XLSX.utils.encode_cell({c: colIndices.sentimentMagnitude, r: row});
+                        var timeRounded = worksheet[timeCell].v % 5 <= 1.5 ? worksheet[timeCell].v - (worksheet[timeCell].v % 5) : worksheet[timeCell].v + (5-(worksheet[timeCell].v % 5));
 
                         if (worksheet[videoCell] !== undefined & worksheet[timeCell] !== undefined & worksheet[sentimentScoreCell] !== undefined
                         & worksheet[sentimentMagnitudeCell] !== undefined & worksheet[commentCell] !== undefined){
-                            data.push({video: worksheet[videoCell].v, x: getDisplayTime(worksheet[timeCell].v), y: worksheet[sentimentScoreCell].v, r: worksheet[sentimentMagnitudeCell].v * 10, comment: worksheet[commentCell].v});
+                            data.push({video: worksheet[videoCell].v, x: getDisplayTime(worksheet[timeCell].v), y: worksheet[sentimentScoreCell].v, r: worksheet[sentimentMagnitudeCell].v * 10, rOrig: worksheet[sentimentMagnitudeCell].v * 10, comment: worksheet[commentCell].v});
                             videoList.add(worksheet[videoCell].v);
+
+                            // add sentiment to average sentiment map of arrays
+                            avgSentiment.set(timeRounded + ',' + worksheet[videoCell].v, avgSentiment.get(timeRounded + ',' + worksheet[videoCell].v) === undefined ? [worksheet[sentimentScoreCell].v] : avgSentiment.get(timeRounded + ',' + worksheet[videoCell].v).concat([worksheet[sentimentScoreCell].v]));
                         }
 
                         if (worksheet[videoCell] !== undefined & worksheet[timeCell] !== undefined & worksheet[commentCell] !== undefined){
-                            var timeRounded = worksheet[timeCell].v % 5 <= 1.5 ? worksheet[timeCell].v - (worksheet[timeCell].v % 5) : worksheet[timeCell].v + (5-(worksheet[timeCell].v % 5));
                             //console.log(numComments.get(timeRounded + ',' + worksheet[videoCell].v));
                             numComments.set(timeRounded + ',' + worksheet[videoCell].v, numComments.get(timeRounded + ',' + worksheet[videoCell].v) === undefined ? 1 : numComments.get(timeRounded + ',' + worksheet[videoCell].v)+1);
                             //console.log(numComments.get(timeRounded + ',' + worksheet[videoCell].v));
@@ -136,22 +144,35 @@
                     }
 
                     var commentsFrequencies = Array.from(numComments); // needs to change to support IE
+                    var averageSentimentScore = Array.from(avgSentiment); // needs to change to support IE
                     //debugger;
                     commentsFrequencies.sort(sortCommentFrequencies);
+                    averageSentimentScore.sort(sortCommentFrequencies);
                     //debugger;
+
+                    // format comments frequenies for chartjs
                     for (var i=0; i<commentsFrequencies.length; i++){
                         var split = commentsFrequencies[i][0].indexOf(',');
                         commentsFrequencies[i] = {x: getDisplayTime(Number(commentsFrequencies[i][0].substring(0,split))), y:commentsFrequencies[i][1], video:commentsFrequencies[i][0].substring(split+1)};
                     }
+
+                    // format average sentiment for chartjs
+                    for (var i=0; i<averageSentimentScore.length; i++){
+                        var split = averageSentimentScore[i][0].indexOf(',');
+                        averageSentimentScore[i] = {x: getDisplayTime(Number(averageSentimentScore[i][0].substring(0,split))), y: averageSentimentScore[i][1].reduce(sumArray)/averageSentimentScore[i][1].length, video:averageSentimentScore[i][0].substring(split+1)};
+                    }
                     //debugger;
                     
-                    return [data, videoList, commentsFrequencies];
+                    
+                    return [data, videoList, commentsFrequencies, averageSentimentScore];
+
+                    function sumArray(accumulator, currentValue){
+                        return accumulator + currentValue;
+                    }
 
                     function sortCommentFrequencies(a, b){
                         var aTime = a[0].indexOf(',');
                         var bTime = b[0].indexOf(',');
-                        //a.substring(0,aTime);
-                        //b.substring(0,bTime);
                         if (Number(a[0].substring(0,aTime)) < Number(b[0].substring(0,bTime))){
                             return -1;
                         } else {
@@ -175,8 +196,16 @@
 
                     $('body').append($('<div class="dropdown">' + 
                                             '<label for="dataset-select">Video </label>' + 
-                                            '<select id="dataset-select"></select>' +   
-                                            '<input id="showComments" type="checkbox">Show comment volume</input>' + 
+                                            '<select id="dataset-select"></select>' +  
+                                            '<div id="showOptions"><p id="toggleOptions">Chart Options ></p>' +
+                                                '<div class="options" id="options">' +
+                                                '<input id="showComments" type="checkbox">Show comment volume</input>' + 
+                                                '<input id="showAverage" type="checkbox">Show average sentiment</input>' + 
+                                                '<input id="scaleBubbles" type="checkbox" checked="true">Scale bubbles</input>' + 
+                                                '<input type="color" id="positiveColor" value="#00436b">Positive Color</input>' + 
+                                                '<input type="color" id="negativeColor" value="#be0000">Negative Color</input>' + 
+                                                '</div>' +
+                                            '</div>' + 
                                         '</div>'));
                     $('body').append('<canvas id="myChart"></canvas>');
                     $('body').append('<div id="crop-start">' + 

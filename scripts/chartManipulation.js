@@ -4,7 +4,14 @@ document.addEventListener("Data Loaded", function(event){
     var cropStartBtn = document.getElementById('crop-start-btn');
     var cropEndBtn = document.getElementById('crop-end-btn');
     var showComments = document.getElementById('showComments');
+    var showAverage = document.getElementById('showAverage');
+    var scaleBubbles = document.getElementById('scaleBubbles');
+    var positiveColor = document.getElementById('positiveColor');
+    var negativeColor = document.getElementById('negativeColor');
+    var optionsToggle = document.getElementById('toggleOptions');
+    var options = document.getElementById('options');
     var shownCommentData = [];
+    var shownAverageData = [];
 
     filterData();
 
@@ -35,6 +42,13 @@ document.addEventListener("Data Loaded", function(event){
                                             data: shownCommentData,
                                             yAxisID: 'comment-axis',
                                             type: 'line',
+                                        },
+                                        {
+                                            data: shownAverageData,
+                                            yAxisID: 'average-axis',
+                                            type: 'line',
+                                            fill: false,
+                                            borderColor: "rgb(125,125,125)",
                                         }
                                     ]
                                 },
@@ -115,6 +129,18 @@ document.addEventListener("Data Loaded", function(event){
                                                 stepSize: 1,
                                             },
                                             display: false,   
+                                        },{
+                                            id: 'average-axis',
+                                            position: 'right',
+                                            scaleLabel: {
+                                                display: true,
+                                                labelString: 'Average sentiment',
+                                                fontStyle: 'bold',
+                                            },
+                                            ticks: {                                                
+                                                fontStyle: 'bold',
+                                            },
+                                            display: false,   
                                         }]
                                     }
                                 }                                             
@@ -151,6 +177,9 @@ document.addEventListener("Data Loaded", function(event){
             selectedCommentData = commentData.filter(function(dPoint){
                 return dPoint.video === selectedDatasetName.value & dPoint.x >= axisMin & (dPoint.x <= axisMax || axisMax === undefined);
             });
+            selectedAverageData = averageData.filter(function(dPoint){
+                return dPoint.video === selectedDatasetName.value & dPoint.x >= axisMin & (dPoint.x <= axisMax || axisMax === undefined);
+            });
         } else if (direction === "end"){
             if (reset){
                 axisMax = undefined;
@@ -161,6 +190,9 @@ document.addEventListener("Data Loaded", function(event){
                     return dPoint.video === selectedDatasetName.value & dPoint.y < 0 & (dPoint.x >= axisMin || axisMin === undefined);
                 });
                 selectedCommentData = commentData.filter(function(dPoint){
+                    return dPoint.video === selectedDatasetName.value & (dPoint.x >= axisMin || axisMin === undefined);
+                });
+                selectedAverageData = averageData.filter(function(dPoint){
                     return dPoint.video === selectedDatasetName.value & (dPoint.x >= axisMin || axisMin === undefined);
                 });
             } else{
@@ -174,10 +206,15 @@ document.addEventListener("Data Loaded", function(event){
                 selectedCommentData = commentData.filter(function(dPoint){
                     return dPoint.video === selectedDatasetName.value & dPoint.x <= axisMax & (dPoint.x >= axisMin || axisMin === undefined);
                 });
+
+                selectedAverageData = averageData.filter(function(dPoint){
+                    return dPoint.video === selectedDatasetName.value & dPoint.x <= axisMax & (dPoint.x >= axisMin || axisMin === undefined);
+                });
             }
         }
 
         selectedCommentData = insertMissingTimes(selectedCommentData);
+        //selectedAverageData = insertMissingTimes(selectedAverageData);
 
         if (positiveSelectedData.length !== 0 | negativeSelectedData.length !== 0){
             
@@ -188,6 +225,7 @@ document.addEventListener("Data Loaded", function(event){
             chart.data.datasets[0].data = positiveSelectedData;
             chart.data.datasets[1].data = negativeSelectedData;
             chart.data.datasets[2].data = showComments.checked ? selectedCommentData : [];
+            chart.data.datasets[3].data = showAverage.checked ? selectedAverageData : [];
 
             chart.update();
 
@@ -259,6 +297,13 @@ document.addEventListener("Data Loaded", function(event){
 
         selectedCommentData = insertMissingTimes(selectedCommentData);
         
+        selectedAverageData = averageData.filter(function(dPoint){
+            return dPoint.video === selectedDatasetName.value;
+            
+        });
+
+        //selectedAverageData = insertMissingTimes(selectedAverageData);  // 8/21 - might need to replicate this for averages
+        
     }
 
     function insertMissingTimes(array){
@@ -290,6 +335,7 @@ document.addEventListener("Data Loaded", function(event){
         chart.data.datasets[0].data = positiveSelectedData;
         chart.data.datasets[1].data = negativeSelectedData;
         chart.data.datasets[2].data = showComments.checked ? selectedCommentData : [];
+        chart.data.datasets[3].data = showAverage.checked ? selectedAverageData : [];
 
         
         selectedDatasetTitle = document.querySelector("option[value='" + selectedDatasetName.value + "']").innerHTML;
@@ -301,8 +347,8 @@ document.addEventListener("Data Loaded", function(event){
         chart.update();
     });
 
-    showComments.addEventListener("change", function(){
-        console.log(showComments.checked);
+    showComments.addEventListener('change', function(){
+        //console.log(showComments.checked);
         if (showComments.checked){            
             chart.data.datasets[2].data = selectedCommentData;
             chart.options.scales.yAxes[1].display = true;
@@ -311,11 +357,73 @@ document.addEventListener("Data Loaded", function(event){
             chart.options.scales.yAxes[1].display = false;
         }
 
-        console.log(selectedCommentData);
+        //console.log(selectedCommentData);
         chart.options.scales.yAxes[1].ticks.max = undefined;
         chart.update();
     });
 
+    showAverage.addEventListener('change', function(){
+        //console.log(showComments.checked);
+        if (showAverage.checked){            
+            chart.data.datasets[3].data = selectedAverageData;
+            chart.options.scales.yAxes[2].display = true;
+        } else {
+            chart.data.datasets[3].data = [];
+            chart.options.scales.yAxes[2].display = false;
+        }
 
+        //console.log(selectedAverageData);
+        chart.options.scales.yAxes[2].ticks.max = undefined;
+        chart.update();
+    });
+
+    // 8/20
+    scaleBubbles.addEventListener('change', function(){
+        //console.log(scaleBubbles.checked);
+        if (scaleBubbles.checked){   
+            data.forEach(function(dpoint){
+                dpoint.r = dpoint.rOrig;
+            });
+            positiveSelectedData.forEach(function(dpoint){
+                dpoint.r = dpoint.rOrig;
+            });
+            negativeSelectedData.forEach(function(dpoint){
+                dpoint.r = dpoint.rOrig;
+            });       
+        } else {
+            data.forEach(function(dpoint){
+                dpoint.r = 10;
+            });
+            positiveSelectedData.forEach(function(dpoint){
+                dpoint.r = 10;
+            });
+            negativeSelectedData.forEach(function(dpoint){
+                dpoint.r = 10;
+            }); 
+        }
+
+        chart.update();
+    });
+
+    positiveColor.addEventListener('change', function(){
+        chart.data.datasets[0].backgroundColor = positiveColor.value;
+        chart.data.datasets[0].hoverBorderColor = positiveColor.value;
+        chart.update();
+    });
+
+    negativeColor.addEventListener('change', function(){
+        chart.data.datasets[1].backgroundColor = negativeColor.value;
+        chart.data.datasets[1].hoverBorderColor = negativeColor.value;
+        chart.update();
+    });
+
+
+    optionsToggle.addEventListener('click', function(){ // toggles chart options
+        if (options.style.display === "none" | options.style.display === ""){
+            options.setAttribute("style", "display: inline;");
+        } else {
+            options.setAttribute("style", "display: none;");
+        }
+    });
 
 });
